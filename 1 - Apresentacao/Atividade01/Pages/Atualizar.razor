@@ -1,0 +1,165 @@
+﻿@page "/atualizar/{id}"
+
+@using System.Text.RegularExpressions
+@using System.ComponentModel.DataAnnotations
+@using Atividade01.Aplicacao.Services
+@using Atividade01.Aplicacao._Contato
+@using Atividade01.Aplicacao._Contato.Comandos
+@using Atividade01.Aplicacao._Contato.Consultas
+@using Atividade01.Dominio.Validadores.Contato
+@using Atividade01.Dominio.ViewModel
+@using System.Text.Json
+@using FluentValidation.Results
+@inject IContatoComandos _comandos
+@inject IContatoConsultas _consultas
+@inject IObterMunicipios _municipioservices;
+@inject NavigationManager NavigationManager;
+
+<form @onsubmit="Submit"  >
+    <div class="form-group">
+        <label for="inputNome">Nome</label>
+        <input type="text" @bind-value="Contato.Nome" class="form-control" id="inputNome" placeholder="Email">
+    </div>
+
+    <div class="form-group">
+        <label for="inputEmail">Email</label>
+        <input type="email" @bind-value="Contato.Email" class="form-control" id="inputEmail" placeholder="Email">
+    </div>
+
+    <div class="form-row">
+        <div class="form-group col-md-2">
+            <label for="inputDDD">DDD</label>
+            <input type="text" @bind-value="Contato.DDD" @onload="ObterLocalizacao" maxlength="2" @onblur="ObterLocalizacao" @onkeypress="ObterLocalizacao" class="form-control" id="inputDDD" placeholder="DDD">
+        </div>
+        <div class="form-group col-md-10">
+            <label for="inputTelefone">Telefone</label>
+            <input type="text" @bind-value="Contato.Telefone" @onblur="ObterLocalizacao" class="form-control" maxlength="9" min="8" id="inputTelefone" placeholder="Telefone">
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group col-md-6">
+            <label for="inputEstado">Estado</label>
+            <input type="text" @bind-value="Contato.Estado" disabled class="form-control" id="inputEstado">
+        </div>
+        <div class="form-group col-md-6">
+            <label for="inputCidade">Municípios</label>
+            <select id="inputCidade" class="form-control"  @bind="Contato.Municipio">
+                <option value="@Contato.Municipio">@Contato.Municipio</option>
+
+                @foreach (var munic in municipios!)
+                {
+                    <option value="@munic">@munic</option>
+                }
+
+            </select>
+        </div>
+    </div>
+   
+    <button type="submit" @onclick="Submit" class="btn btn-primary">Cadastrar</button>
+</form>
+
+
+<MudContainer Class="w-100 h-50 position-absolute  p-5">
+    @if (sucesso)
+    {
+        <MudAlert Class="position-absolute"  Severity="Severity.Success" Variant="Variant.Filled">Contato Cadastrado com sucesso!</MudAlert>
+    }
+
+
+    @if (erros)
+    {
+        @foreach (var erro in listaErros)
+        {
+            <div style="position:absolute" class="alert alert-warning alert-dismissible fade show " role="alert">
+                <strong>@erro.ErrorMessage</strong>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        }
+    }
+</MudContainer>
+
+
+
+
+
+@code {
+
+    [Parameter] 
+    public string? id { get; set; }
+
+    [SupplyParameterFromForm]
+    public Contato? Contato { get; set; } = new();
+    public string[]? municipios = [];
+    public bool sucesso = false;
+    public bool erros = false;
+    private bool habilitarMunicipios = true;
+    private bool submitted = false;
+    List<ValidationFailure> listaErros;
+
+
+    protected override async void OnInitialized()
+    {
+        if(id != null)
+        {
+            Contato = await _consultas.ObterPorId(id);
+
+            if(Contato != null)
+            {
+                var localidade = await _municipioservices.Get(Contato.DDD!);
+
+                if(localidade != null)
+                {
+                    municipios = localidade.Cities;
+                }
+            }
+        }
+    }
+
+
+    private void CloseMe()
+    {
+        erros = false;
+    }
+
+
+    public  async void ObterLocalizacao()
+    {
+        if(Contato?.DDD?.Length == 2)
+        {
+            var resultado = await  _municipioservices.Get(Contato.DDD);
+            if(resultado != null)
+            {
+                municipios = resultado!.Cities;
+                Contato.Estado = resultado!.State;
+                habilitarMunicipios = false;
+
+            };
+        }
+    }
+
+
+    private async Task Submit()
+    {
+        var resultadoComando = await _comandos.Atualizar(Contato);
+
+        if (resultadoComando.Sucesso)
+        {
+            sucesso = true;
+            await Task.Delay(500);
+            NavigationManager.NavigateTo("/");
+        }
+        else
+        {
+            erros = true;
+            listaErros = resultadoComando.Dados != null ? (List<ValidationFailure>)resultadoComando.Dados! : default;
+        }
+    }
+
+
+
+
+    
+}

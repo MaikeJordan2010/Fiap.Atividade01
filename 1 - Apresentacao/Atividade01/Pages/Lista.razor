@@ -1,0 +1,118 @@
+﻿@page "/"
+@using Atividade01.Aplicacao._Contato
+@using Atividade01.Aplicacao._Contato.Comandos
+@using Atividade01.Aplicacao._Contato.Consultas
+@using Atividade01.Dominio.ViewModel
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IContatoComandos _comandos
+@inject IContatoConsultas _consultas
+@inject IJSRuntime JSRuntime;
+@inject NavigationManager _navigationManager;
+
+
+ <PageTitle>Weather</PageTitle>
+
+ @if(alertaExcluido){
+    <div class="alert alert-danger alert-dismissible fade show position-relative float-end"  role="alert">
+        <strong>Alerta</strong> Item Excluído com sucesso!.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" @onclick="FecharAlertaExcluido" aria-label="Close"></button>
+    </div>
+}
+
+
+<div class="row col-12 mt-5">
+     <div class="col-6">
+        <h1>Lista de Contatos</h1>
+     </div>
+    <div class="row col-6 justify-content-center align-items-end">
+        <div class="row col-6">
+            <label for="inputPesquisa" class="visually-hidden">DDD</label>
+            <input type="text" @bind-value="ddd" class="form-control mb-1 " @onkeypress="PesquisarPorDDD" id="inputPesquisa" placeholder="DDD">
+        </div>
+        <div class="row col-auto ">
+            <button type="submit" @onclick="PesquisarPorDDD" class="btn btn-primary mb-1">Pesquisar</button>
+        </div>
+     </div>
+ </div>
+
+
+@if (Contatos == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    
+    <table class="table table-striped table-hover" style="font-weight:bold" >
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>DDD</th>
+                <th>Telefone</th>
+                <th>UF</th>
+                <th>Municipio</th>
+                <th>
+                    <td><a href="/cadastrar" class="btn btn-success">Cadastrar</a></td>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var contato in Contatos)
+            {
+                <tr>
+                    <td>@contato.Nome</td>
+                    <td>@contato.Email</td>
+                    <td>@contato.DDD</td>
+                    <td>@contato.Telefone</td>
+                    <td>@contato.Estado</td>
+                    <td>@contato.Municipio</td>
+                    <td><a href="/atualizar/@contato.Guid" class="btn btn-primary">Atualizar</a></td>
+                    <td><a href="#" @onclick="(() => Excluir(contato.Guid))" class="btn btn-danger">Excluir</a></td>
+
+                </tr>
+            }
+        </tbody>
+    </table>
+} 
+
+
+@code {
+    private IEnumerable<Contato>? Contatos;
+    private string? ddd;
+    private bool alertaExcluido = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Contatos = await _consultas.ObterLista();
+    }
+
+    private async void PesquisarPorDDD()
+    {
+        Contatos = await _consultas.ObterListaPorDDD(ddd!);
+    }
+
+    private void FecharAlertaExcluido()
+    {
+        alertaExcluido = false;
+    }
+
+    private async Task Excluir(string guid)
+    {
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Tem certeza que deseja excluir?");
+        if (confirmed is false) return;
+
+        var resultado = await _comandos.Excluir(guid);
+
+        if (resultado.Sucesso)
+        {
+            alertaExcluido = true;
+            Contatos = await _consultas.ObterLista();
+
+            StateHasChanged();
+        }
+
+    }
+
+}
